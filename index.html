@@ -69,6 +69,7 @@ button{cursor:pointer}
 .top h1,.brandbar h1{color:var(--fg)}
 .bk-note{display:block;width:100%;margin-top:12px;padding:10px 14px;border:1px solid var(--orange);border-radius:6px;background:transparent;color:var(--fg);font-size:13px;text-align:left}
 .bk-note b{color:var(--gold-ink)}
+.lock-note{margin:0;padding:10px 14px;border-radius:6px;background:var(--surface);font-size:13px;color:var(--muted)}
 /* list */
 .clist{display:grid}
 .crow{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
@@ -276,6 +277,11 @@ function renderDetail(){
   </section>
   <section class="section"><div class="sec-head"><h2>来店記録</h2></div><div class="tl">${tl||'<p class="muted">記録はまだありません。</p>'}</div>
     <div id="delCust"><button class="linkbtn warn" id="delC">このお客様を削除</button></div></section>`;
+  if(c.sample){
+    ["#shoot","#shootB","#addMore","#delCust"].forEach(q=>{const el=$(q);if(el)el.remove()});
+    document.querySelectorAll("[data-edit],[data-del]").forEach(el=>el.remove());
+    const sec=$("#app .section");if(sec)sec.insertAdjacentHTML("beforeend",'<p class="lock-note">この方は見本です。写真の追加・編集・削除はできません。比較と「お客様に送る画像をつくる」はお試しいただけます。</p>');
+  }
   $("#back").onclick=()=>{view.name="list";render()};
   $("#shoot").onclick=()=>openCapture();
   if($("#addMore"))$("#addMore").onclick=()=>openCapture(tgt.v.id,false,missOf(tgt.v)[0][0]);
@@ -314,6 +320,7 @@ function loadFile(file){return new Promise((res,rej)=>{const fr=new FileReader()
 function openSheet(html){const sh=$("#sheet");sh.innerHTML=html;sh.hidden=false;sh.scrollTop=0;document.body.style.overflow="hidden"}
 function closeSheet(){$("#sheet").hidden=true;$("#sheet").innerHTML="";document.body.style.overflow=""}
 function openCapture(editId,asBefore,startAngle){
+  if(cust()&&cust().sample)return;
   const c=cust(),editing=editId?c.visits.find(v=>v.id===editId):null,isB=editing?!!editing.before:!!asBefore;
   const idx=editing?c.visits.indexOf(editing):c.visits.length,prev=isB?null:(idx>0?c.visits[idx-1]:null);
   const me=isB?"ビフォア":editing?lab(c,idx):(tcount(c)+1)+"回目",prevLab=prev?lab(c,idx-1):"";
