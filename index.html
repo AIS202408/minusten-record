@@ -69,6 +69,39 @@ button{cursor:pointer}
 .top h1,.brandbar h1{color:var(--fg)}
 .bk-note{display:block;width:100%;margin-top:12px;padding:10px 14px;border:1px solid var(--orange);border-radius:6px;background:transparent;color:var(--fg);font-size:13px;text-align:left}
 .bk-note b{color:var(--gold-ink)}
+.col-btn{display:flex;align-items:center;gap:14px;width:100%;margin-top:14px;padding:12px 14px;border:1px solid var(--line);border-radius:6px;background:var(--surface);text-align:left}
+.col-btn .thumbs{display:flex;flex:none}
+.col-btn .thumbs img{width:44px;height:56px;object-fit:cover;border-radius:3px;border:2px solid var(--bg)}
+.col-btn .thumbs img+img{margin-left:-14px}
+.col-btn b{display:block;font-family:var(--f-display);font-size:17px}
+.col-btn span{font-size:12px;color:var(--muted)}
+.col-btn .go{margin-left:auto;color:var(--gold-ink);font-size:20px}
+.gal-tools{display:grid;gap:10px}
+.gal-opts{display:flex;flex-wrap:wrap;gap:8px 18px}
+.gal{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:640px){.gal{grid-template-columns:1fr 1fr}}
+.gcard{display:grid;gap:8px;padding:10px;border:0;border-radius:8px;background:linear-gradient(180deg,var(--silver-a),var(--silver-b));text-align:left;width:100%;min-width:0}
+.gpair{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.gpair .gph{position:relative;aspect-ratio:3/4;background:#f1eee8;overflow:hidden}
+.gpair .gph img{width:100%;height:100%;object-fit:cover;display:block}
+.gpair .chev{left:calc(50% - 13px)}
+.gcap{display:flex;justify-content:space-between;gap:8px;padding-inline:2px;font-size:12px;color:var(--muted)}
+.gcap b{color:var(--fg)}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px}
+.gcap b{font-family:var(--f-display);font-size:14px}
+.lb{position:fixed;inset:0;z-index:30;background:#121211;color:#fff;display:grid;grid-template-rows:auto 1fr auto;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:calc(10px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-bottom,0px));touch-action:pan-y}
+.lb-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.lb-top .num{font-size:13px;color:#bbb}
+.lb .iconbtn{color:#ddd;border-color:#444}
+.lb-stage{position:relative;display:grid;place-items:center;min-height:0}
+.lb-pair{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:4px;width:min(100%,calc((100vh - 190px)*1.5));max-width:100%}
+.lb-pair .gph{position:relative;aspect-ratio:3/4;background:#2a2a28;overflow:hidden}
+.lb-pair .gph img{width:100%;height:100%;object-fit:contain;display:block}
+.lb-pair .chev{left:calc(50% - 13px)}
+.lb-bot{display:grid;gap:10px;text-align:center}
+.lb-bot b{font-family:var(--f-display);font-size:17px}
+.lb-nav{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lb-nav .btn{background:transparent;border-color:#555;color:#eee}
 /* list */
 .clist{display:grid}
 .crow{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
@@ -204,6 +237,7 @@ function renderList(){
   <header class="brandbar"><img class="logo" src="${LOGO}" alt="マイナステン"><button class="iconbtn" id="setBtn">設定・バックアップ</button></header>
   <figure class="hero"><img src="${BANNER}" alt="マイナステントリートメントのビフォアアフター事例" width="1200" height="677"></figure>
   ${(()=>{const real=S.customers.some(c=>!c.sample&&c.visits.length);if(!real)return"";const old=!S.lastBackup||(Date.now()-new Date(S.lastBackup))/864e5>30;return old?`<button class="bk-note" id="bkNote"><b>バックアップ</b> ${S.lastBackup?"前回から30日以上たっています":"まだ保存していません"}。ここから保存できます →</button>`:""})()}
+  ${(()=>{const it=galItems("back",true);if(!it.length)return"";const t=it.slice(0,3).map(x=>`<img src="${srcOf(angPh(x.B,"back"))}" alt="">`).join("");return `<button class="col-btn" id="colBtn"><span class="thumbs">${t}</span><span><b>コレクション</b><span>ビフォアアフター ${it.length}件を一覧で見る</span></span><span class="go">›</span></button>`})()}
   <section class="section">
     <div class="sec-head"><div><div class="eyebrow">Minus Ten Treatment Record</div><h2 class="h-big">施術記録</h2></div><span class="muted num">${S.customers.length}名</span></div>
     <p class="lead">施術前（ビフォア）と毎回の仕上がりを同じ角度で残し、フォルムの変化をお客様と一緒に確認します。<span class="muted">サンプルのお客様2名は試し用です。</span></p>
@@ -216,6 +250,7 @@ function renderList(){
     $("#addOk").onclick=()=>{const n=$("#newName").value.trim();if(!n){$("#newName").focus();return}
       const c={id:uid(),name:n,visits:[]};S.customers.unshift(c);save();openCustomer(c.id)}};
   $("#setBtn").onclick=openSettings;
+  if($("#colBtn"))$("#colBtn").onclick=()=>openGallery();
   if($("#bkNote"))$("#bkNote").onclick=openSettings;
 }
 function openCustomer(id){view={name:"detail",cid:id,a:0,b:0,angle:"back"};const c=cust();view.b=Math.max(0,c.visits.length-1);render();scrollTo(0,0)}
@@ -510,6 +545,54 @@ async function saveBackup(){
   try{const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);done();return true}catch(e){}
   toast("保存できませんでした");return false;
 }
+// ---------- collection ----------
+let galSt={angle:"back",names:false,samples:true};
+function galItems(angle,samples){
+  const out=[];
+  S.customers.forEach(c=>{if(!samples&&c.sample)return;const vs=c.visits;if(vs.length<2)return;
+    const ai=vs.findIndex(v=>angPh(v,angle));let bi=-1;for(let i=vs.length-1;i>ai;i--){if(angPh(vs[i],angle)){bi=i;break}}
+    if(ai<0||bi<0)return;out.push({c,ai,bi,A:vs[ai],B:vs[bi]})});
+  return out.sort((x,y)=>x.B.date<y.B.date?1:x.B.date>y.B.date?-1:0);
+}
+function pairHTML(x,angle,big){
+  return `<div class="${big?"lb-pair":"gpair"}"><div class="gph"><img src="${srcOf(angPh(x.A,angle))}" alt="${lab(x.c,x.ai)}" loading="lazy"><span class="pill">Before</span></div>${CHEV}<div class="gph"><img src="${srcOf(angPh(x.B,angle))}" alt="${lab(x.c,x.bi)}" loading="lazy"><span class="pill">After</span></div></div>`;
+}
+const galCap=x=>`${lab(x.c,x.ai)} → ${lab(x.c,x.bi)}`;
+function openGallery(){
+  const items=galItems(galSt.angle,galSt.samples);
+  const cards=items.map((x,i)=>`<button class="gcard" data-gi="${i}">${pairHTML(x,galSt.angle,false)}<div class="gcap"><b>${galCap(x)}</b><span class="num">${galSt.names?esc(x.c.name)+" 様・":""}${md(x.B.date)}</span></div></button>`).join("");
+  openSheet(`<div class="app"><header class="top"><button class="iconbtn" id="cx">閉じる</button><div style="text-align:right"><div class="eyebrow">Minus Ten Collection</div><h1>コレクション</h1></div></header>
+    <section class="section gal-tools">
+      <div class="tabs">${ANGLES.map(([a,l])=>`<button class="tab" data-ga="${a}" aria-pressed="${a===galSt.angle}">${l}</button>`).join("")}</div>
+      <div class="gal-opts"><label class="chk"><input type="checkbox" id="gNames" ${galSt.names?"checked":""}> お名前を表示</label><label class="chk"><input type="checkbox" id="gSamp" ${galSt.samples?"checked":""}> 見本を含める</label></div>
+      <p class="note" style="margin:0">各お客様の最初の写真と最新の写真を並べています。タップすると大きく表示します。</p>
+    </section>
+    <section class="section" style="border-bottom:0">${items.length?`<div class="gal">${cards}</div>`:`<p class="muted">この方向で2回以上撮影したお客様がまだいません。</p>`}</section></div>`);
+  $("#cx").onclick=closeSheet;
+  document.querySelectorAll("[data-ga]").forEach(b=>b.onclick=()=>{galSt.angle=b.dataset.ga;openGallery()});
+  $("#gNames").onchange=e=>{galSt.names=e.target.checked;openGallery()};
+  $("#gSamp").onchange=e=>{galSt.samples=e.target.checked;openGallery()};
+  document.querySelectorAll("[data-gi]").forEach(b=>b.onclick=()=>openLightbox(items,+b.dataset.gi));
+}
+function openLightbox(items,i){
+  let lb=$("#lb");if(!lb){lb=document.createElement("div");lb.id="lb";lb.className="lb";document.body.appendChild(lb)}
+  const show=()=>{const x=items[i],ang=galSt.angle;
+    lb.innerHTML=`<div class="lb-top"><span class="num">${i+1} / ${items.length}</span><button class="iconbtn" id="lbX">閉じる</button></div>
+      <div class="lb-stage">${pairHTML(x,ang,true)}</div>
+      <div class="lb-bot"><div><b>${galCap(x)}</b><div class="num" style="font-size:12px;color:#bbb">${ANG[ang]}・${galSt.names?esc(x.c.name)+" 様・":""}${md(x.A.date)} → ${md(x.B.date)}</div></div>
+        <div class="lb-nav"><button class="btn sm" id="lbP" ${i===0?"disabled":""}>‹ 前へ</button><button class="btn sm" id="lbN" ${i===items.length-1?"disabled":""}>次へ ›</button></div>
+        <button class="linkbtn" id="lbS" style="color:#ccc">この組み合わせで送る画像をつくる</button></div>`;
+    $("#lbX").onclick=close;$("#lbP").onclick=()=>go(-1);$("#lbN").onclick=()=>go(1);
+    $("#lbS").onclick=()=>{close();closeSheet();view={name:"detail",cid:x.c.id,a:x.ai,b:x.bi,angle:ang};render();openShare()};
+  };
+  const go=d=>{const j=i+d;if(j<0||j>=items.length)return;i=j;show()};
+  const close=()=>{lb.remove();document.removeEventListener("keydown",key)};
+  const key=e=>{if(e.key==="ArrowRight")go(1);else if(e.key==="ArrowLeft")go(-1);else if(e.key==="Escape")close()};
+  document.addEventListener("keydown",key);
+  let sx=null;lb.onpointerdown=e=>{sx=e.clientX};lb.onpointerup=e=>{if(sx==null)return;const dx=e.clientX-sx;sx=null;if(Math.abs(dx)>50)go(dx<0?1:-1)};
+  show();
+}
+
 function render(){view.name==="detail"?renderDetail():renderList()}
 (async()=>{S=migrate(await load()||defaultState());render()})();
 })();
