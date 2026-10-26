@@ -116,6 +116,8 @@ button{cursor:pointer}
 @keyframes flash{0%,100%{box-shadow:0 0 0 0 rgba(237,106,31,0)}40%{box-shadow:0 0 0 8px rgba(237,106,31,.45)}}
 .flash{animation:flash 1.2s ease 2}
 @media (prefers-reduced-motion:reduce){.flash{animation:none;outline:3px solid var(--orange)}}
+.cam-hint{display:flex;gap:10px;align-items:flex-start;margin:0;padding:10px 12px;border-radius:6px;background:var(--surface);font-size:13px;line-height:1.6}
+.ok-dot{flex:none;width:30px;height:30px;border-radius:50%;background:#fff;border:3px solid #333;color:#222;display:grid;place-items:center;font-size:14px;font-weight:700}
 /* list */
 .clist{display:grid}
 .crow{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
@@ -447,6 +449,7 @@ function openCapture(editId,asBefore,startAngle){
         :`<div class="guide" style="grid-template-columns:1fr"><div><b>${ANG[a]}の撮影</b><ul><li>撮影場所と照明を毎回同じに</li><li>${TIP[a]}</li><li>スマホは縦向き</li></ul></div></div>`}
       ${h?`<div class="cropbox" id="cb"><canvas id="cc" width="${FW}" height="${FH}"></canvas><div class="cropgrid"></div></div><div id="ctrl" style="display:grid;gap:12px"></div>`:""}
       <div class="row2"><label class="btn${h?" ghost":""}" for="file">${h?"撮り直す":"カメラで撮る"}</label><label class="btn ghost" for="file2">${h?"アルバムから選び直す":"アルバムから選ぶ"}</label></div>
+      ${LIVECAM&&!h?`<p class="cam-hint"><span class="ok-dot">✓</span><span>カメラで撮影したあと、画面下の<b>丸い ✓ ボタン</b>を押すと取り込まれます。<br>左の <b>↺</b> は撮り直しです。</span></p>`:""}
       ${LIVECAM?`<button class="linkbtn" id="liveCam" style="justify-self:start">撮った写真が戻ってこないときは：画面の中のカメラで撮る</button>`:""}
       ${h?`<button class="linkbtn warn" id="rmA" style="justify-self:start">この方向の写真を外す</button>`:""}
       ${h?`<button class="btn block take" id="takeA">✓ この写真を取り込む${nextA?`（次は${ANG[nextA]}）`:""}</button>`:""}`;
