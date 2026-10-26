@@ -112,6 +112,10 @@ button{cursor:pointer}
 .cam-shot:disabled{opacity:.4}
 .iab{display:grid;gap:4px;margin:12px 0 0;padding:12px 14px;border:1px solid var(--orange);border-radius:6px;background:var(--surface);font-size:13px;line-height:1.6}
 .iab b{color:var(--gold-ink);font-size:14px}
+.btn.take{background:var(--orange);border-color:var(--orange);color:#fff}
+@keyframes flash{0%,100%{box-shadow:0 0 0 0 rgba(237,106,31,0)}40%{box-shadow:0 0 0 8px rgba(237,106,31,.45)}}
+.flash{animation:flash 1.2s ease 2}
+@media (prefers-reduced-motion:reduce){.flash{animation:none;outline:3px solid var(--orange)}}
 /* list */
 .clist{display:grid}
 .crow{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
@@ -445,9 +449,12 @@ function openCapture(editId,asBefore,startAngle){
       <div class="row2"><label class="btn${h?" ghost":""}" for="file">${h?"撮り直す":"カメラで撮る"}</label><label class="btn ghost" for="file2">${h?"アルバムから選び直す":"アルバムから選ぶ"}</label></div>
       ${LIVECAM?`<button class="linkbtn" id="liveCam" style="justify-self:start">撮った写真が戻ってこないときは：画面の中のカメラで撮る</button>`:""}
       ${h?`<button class="linkbtn warn" id="rmA" style="justify-self:start">この方向の写真を外す</button>`:""}
-      ${h&&nextA?`<button class="btn block" id="nextA">続けて${ANG[nextA]}を撮る →</button>`:""}
-      ${h&&!nextA?`<p class="note" style="margin:0">3方向そろいました。下の「${editing?"保存する":"記録する"}」で保存します。</p>`:""}`;
-    if($("#nextA"))$("#nextA").onclick=()=>{st.angle=nextA;renderTabs();renderPanel();$("#tabs").scrollIntoView({block:"start",behavior:"smooth"})};
+      ${h?`<button class="btn block take" id="takeA">✓ この写真を取り込む${nextA?`（次は${ANG[nextA]}）`:""}</button>`:""}`;
+    if($("#takeA"))$("#takeA").onclick=()=>{
+      if(nextA){toast(`${ANG[a]}を取り込みました。次は${ANG[nextA]}です`);st.angle=nextA;renderTabs();renderPanel();$("#tabs").scrollIntoView({block:"start",behavior:"smooth"});return}
+      toast(`取り込みました。最後に「${editing?"保存する":"記録する"}」を押してください`);
+      const sv=$("#sv");sv.scrollIntoView({block:"center",behavior:"smooth"});sv.classList.remove("flash");void sv.offsetWidth;sv.classList.add("flash");
+    };
     if($("#rmA"))$("#rmA").onclick=()=>{delete st.crops[a];st.removed[a]=true;renderTabs();renderPanel()};
     if(cr)mount(cr);
     else if(h){const g=$("#cc").getContext("2d");g.fillStyle=FILL;g.fillRect(0,0,FW,FH);
@@ -505,16 +512,20 @@ function drawContain(g,img,x,y,w,h){g.fillStyle="#f1eee8";g.fillRect(x,y,w,h);co
 const loadImg=src=>new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(null);i.src=src});
 async function openShare(){
   const c=cust(),A=c.visits[view.a],B=c.visits[view.b],salon=S.salon||"",ang=view.angle;
+  const isAndroid=/Android/i.test(navigator.userAgent);
   openSheet(`<div class="app"><header class="top"><button class="iconbtn" id="cx">閉じる</button><div style="text-align:right"><div class="eyebrow">${esc(c.name)} 様</div><h1>送る画像</h1></div></header>
     <section class="section"><div id="imgWrap"><p class="muted">画像をつくっています…</p></div>
+      <label class="chk"><input type="checkbox" id="inImg" ${isAndroid?"checked":""}> メッセージを画像の中に入れる${isAndroid?"（Androidは画像と文章を一緒に送れないため、オンがおすすめ）":""}</label>
       <div id="shareArea" style="display:grid;gap:8px"></div>
       <p class="note" id="shareNote">画像を長押しして保存し、LINEで送ってください。</p></section>
-    <section class="section"><div class="field"><label for="msg">LINEに添えるメッセージ</label><textarea id="msg" rows="6"></textarea></div>
-      <button class="btn block" id="cp">メッセージをコピー</button></section></div>`);
+    <section class="section"><div class="field"><label for="msg">メッセージ</label><textarea id="msg" rows="6"></textarea></div>
+      <button class="btn ghost block" id="cp">メッセージをコピー</button></section></div>`);
   $("#cx").onclick=closeSheet;
+  $("#msg").value=`${c.name.split(/\s/)[0]}様\n本日もありがとうございました${salon?"。"+salon+"です":""}。\n${lab(c,view.a)}と${lab(c,view.b)}の髪を比べてみました。ツヤやまとまりの変化をぜひご覧ください。\n続けるほど変化を実感していただけるので、次回もお待ちしています。`;
   const [ia,ib]=await Promise.all([loadImg(srcOf(angPh(A,ang)||mainPh(A))),loadImg(srcOf(angPh(B,ang)||mainPh(B)))]);
   await (document.fonts&&document.fonts.ready);
-  const W=1080,H=1350,cv=document.createElement("canvas");cv.width=W;cv.height=H;const g=cv.getContext("2d");
+  // base card
+  const W=1080,H=1350,base=document.createElement("canvas");base.width=W;base.height=H;const g=base.getContext("2d");
   const logo=await loadImg(LOGO);
   g.fillStyle="#ffffff";g.fillRect(0,0,W,H);
   const band=g.createLinearGradient(0,0,0,250);band.addColorStop(0,"#8c8c8b");band.addColorStop(1,"#e4e4e3");g.fillStyle=band;g.fillRect(0,0,W,250);
@@ -535,38 +546,53 @@ async function openShare(){
   g.strokeStyle="#e1e0dd";g.lineWidth=2;g.beginPath();g.moveTo(140,H-170);g.lineTo(W-140,H-170);g.stroke();
   if(logo){const lw=300,lh=lw*logo.naturalHeight/logo.naturalWidth;g.drawImage(logo,W/2-lw/2,H-140,lw,lh)}
   g.fillStyle="#262523";g.font="600 34px 'Shippori Mincho',serif";g.fillText(salon||"サロン名（設定で入力）",W/2,H-48);
-  const url=cv.toDataURL("image/jpeg",.9);
-  $("#imgWrap").innerHTML=`<img class="shareimg" src="${url}" alt="ビフォアアフター比較画像">`;
-  const left=Math.max(0,(S.goal||10)-c.visits.length);
-  $("#msg").value=`${c.name.split(/\s/)[0]}様\n本日もありがとうございました${salon?"。"+salon+"です":""}。\n${lab(c,view.a)}と${lab(c,view.b)}の髪を比べてみました。ツヤやまとまりの変化をぜひご覧ください。\n続けるほど変化を実感していただけるので、次回もお待ちしています。`;
+  // message panel under the card
+  const wrap=(ctx,text,maxW)=>{const out=[];String(text).split("\n").forEach(par=>{let line="";for(const ch of par){if(ctx.measureText(line+ch).width>maxW&&line){out.push(line);line=ch}else line+=ch}out.push(line)});return out};
+  function compose(withMsg){
+    const msg=$("#msg").value.trim();
+    if(!withMsg||!msg)return base;
+    const m=document.createElement("canvas").getContext("2d");m.font="400 34px 'Zen Kaku Gothic New',sans-serif";
+    const lines=wrap(m,msg,W-200),lh=54,boxH=lines.length*lh+90;
+    const cv=document.createElement("canvas");cv.width=W;cv.height=H+boxH+40;const x=cv.getContext("2d");
+    x.drawImage(base,0,0);x.fillStyle="#ffffff";x.fillRect(0,H,W,boxH+40);
+    x.fillStyle="#f2f2f1";x.beginPath();x.roundRect?x.roundRect(60,H,W-120,boxH,16):x.rect(60,H,W-120,boxH);x.fill();
+    x.fillStyle="#ed6a1f";x.fillRect(60,H,8,boxH);
+    x.fillStyle="#262523";x.font="400 34px 'Zen Kaku Gothic New',sans-serif";x.textAlign="left";
+    lines.forEach((l,i)=>x.fillText(l,100,H+60+i*lh));
+    return cv;
+  }
+  let file=null,dl="",busy=0;
   const copyMsg=()=>{try{const pr=navigator.clipboard&&navigator.clipboard.writeText($("#msg").value);if(pr&&pr.catch)pr.catch(()=>{})}catch(e){}};
-  const isAndroid=/Android/i.test(navigator.userAgent);
-  const lineText=()=>"https://line.me/R/share?text="+encodeURIComponent($("#msg").value);
-  cv.toBlob(blob=>{
-    const file=blob?new File([blob],"minusten-before-after.jpg",{type:"image/jpeg"}):null;
-    let ok=false;try{ok=!!(file&&navigator.canShare&&navigator.canShare({files:[file]}))}catch(e){}
-    const dl=blob?URL.createObjectURL(blob):"";
-    if(isAndroid){
-      $("#shareArea").innerHTML=(ok?'<button class="btn block" id="shareBtn">LINEで送る（画像＋メッセージ）</button>':`<a class="btn block" id="saveImg" href="${dl}" download="minusten-before-after.jpg">画像を保存する</a>`)+
-        `<a class="linkbtn" id="lineMsg" href="${lineText()}" target="_blank" rel="noopener" style="justify-self:start">メッセージだけをLINEで送る</a>`;
-      $("#shareNote").innerHTML=ok?"<b>送り方</b>：ボタンを押す → LINEを選ぶ → お客様を選んで画像を送る → トークの入力欄を<b>長押しして「貼り付け」</b>→ 送信。<br>メッセージはボタンを押したときに自動でコピーされています。":"画像を保存し、LINEのトークで写真として送ってください。メッセージは下の「メッセージだけをLINEで送る」から送れます。";
-    }else if(ok){
-      $("#shareArea").innerHTML='<button class="btn block" id="shareBtn">LINEで送る（画像＋メッセージ）</button>';
-      $("#shareNote").textContent="共有画面でLINEを選び、送る相手を選んでください。メッセージが付かないときは、トークに貼り付けてください（自動でコピーされます）。";
-    }else return;
-    const sb=$("#shareBtn");
-    if(sb)sb.onclick=()=>{
-      copyMsg();if(isAndroid)toast("メッセージをコピーしました。LINEで貼り付けてください");
-      const data=isAndroid?{files:[file]}:{files:[file],text:$("#msg").value};
-      navigator.share(data).catch(e=>{
-        if(e&&e.name==="AbortError")return;
-        if(data.text){navigator.share({files:[file]}).catch(e2=>{if(e2&&e2.name!=="AbortError")toast("共有できませんでした。画像を長押しして保存してください")});return}
-        toast("共有できませんでした。画像を長押しして保存してください");
-      });
-    };
-    const lm=$("#lineMsg");if(lm){$("#msg").addEventListener("input",()=>{lm.href=lineText()})}
-  },"image/jpeg",.9);
-  $("#cp").onclick=async()=>{const t=$("#msg");try{await navigator.clipboard.writeText(t.value);toast("コピーしました")}catch(e){t.focus();t.select();toast("選択しました。コピーしてください")}};
+  function refresh(){
+    const my=++busy,inImg=$("#inImg").checked,cv=compose(inImg);
+    cv.toBlob(blob=>{if(my!==busy||!blob)return;
+      if(dl)URL.revokeObjectURL(dl);dl=URL.createObjectURL(blob);
+      file=new File([blob],"minusten-before-after.jpg",{type:"image/jpeg"});
+      $("#imgWrap").innerHTML=`<img class="shareimg" src="${dl}" alt="ビフォアアフター比較画像">`;
+      let ok=false;try{ok=!!(navigator.canShare&&navigator.canShare({files:[file]}))}catch(e){}
+      if(ok){
+        $("#shareArea").innerHTML=`<button class="btn block" id="shareBtn">LINEで送る（画像＋メッセージ）</button>`;
+        $("#shareNote").innerHTML=inImg?"共有画面でLINEを選び、お客様を選ぶだけで、メッセージ入りの画像が1回で届きます。":
+          (isAndroid?"Androidでは文章が付かないことがあります。そのときはトークの入力欄を長押しして「貼り付け」てください（自動でコピーされます）。":"共有画面でLINEを選び、送る相手を選んでください。メッセージが付かないときは、トークに貼り付けてください（自動でコピーされます）。");
+        $("#shareBtn").onclick=()=>{
+          copyMsg();
+          const data=inImg?{files:[file]}:{files:[file],text:$("#msg").value};
+          navigator.share(data).catch(e=>{
+            if(e&&e.name==="AbortError")return;
+            if(data.text){navigator.share({files:[file]}).catch(e2=>{if(e2&&e2.name!=="AbortError")toast("共有できませんでした。画像を長押しして保存してください")});return}
+            toast("共有できませんでした。画像を長押しして保存してください");
+          });
+        };
+      }else{
+        $("#shareArea").innerHTML=isAndroid?`<a class="btn block" href="${dl}" download="minusten-before-after.jpg">画像を保存する</a>`:"";
+        $("#shareNote").textContent=isAndroid?"画像を保存し、LINEのトークで写真として送ってください。":"画像を長押しして保存し、LINEで送ってください。";
+      }
+    },"image/jpeg",.9);
+  }
+  let t=0;$("#msg").addEventListener("input",()=>{clearTimeout(t);t=setTimeout(()=>{if($("#inImg").checked)refresh()},500)});
+  $("#inImg").onchange=refresh;
+  $("#cp").onclick=async()=>{const tx=$("#msg");try{await navigator.clipboard.writeText(tx.value);toast("コピーしました")}catch(e){tx.focus();tx.select();toast("選択しました。コピーしてください")}};
+  refresh();
 }
 
 // ---------- settings ----------
