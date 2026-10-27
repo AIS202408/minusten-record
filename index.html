@@ -124,6 +124,18 @@ button{cursor:pointer}
 .cloud-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--good);flex:none}
 .cloud-chip .dot.busy{background:var(--orange)}
 .cloud-chip .dot.err{background:var(--warn)}
+.gate{position:fixed;inset:0;z-index:50;background:var(--bg);overflow-y:auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(32px + env(safe-area-inset-bottom,0px))}
+.gate-in{max-width:420px;margin:0 auto;display:grid;gap:14px}
+.gate-in .logo{height:26px;width:auto;justify-self:start}
+.gate-hero{margin:0;border-radius:6px;overflow:hidden;background:linear-gradient(180deg,var(--silver-a),var(--silver-b))}
+.gate-hero img{display:block;width:100%;height:auto}
+.gate-title{font-size:24px;letter-spacing:.04em}
+.gate-wait{margin:24px 0 0;color:var(--muted)}
+.gate-err{color:var(--warn)!important}
+.gate-link{justify-self:start;color:var(--gold-ink);font-weight:700;text-decoration:none}
+body.gated{overflow:hidden}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .gate-in .logo{filter:brightness(2.1)}}
+:root[data-theme="dark"] .gate-in .logo{filter:brightness(2.1)}
 /* list */
 .clist{display:grid}
 .crow{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
@@ -199,6 +211,7 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 </style>
 
 <div class="app" id="app"></div>
+<div class="gate" id="gate"></div>
 <div class="sheet" id="sheet" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -260,6 +273,7 @@ function renderList(){
   ${CLOUD.on?`<div class="cloud-chip" id="cloudChip">${chipHTML()}</div>`:""}
   <figure class="hero"><img src="${BANNER}" alt="マイナステントリートメントのビフォアアフター事例" width="1200" height="677"></figure>
   ${(()=>{const real=!CLOUD.on&&S.customers.some(c=>!c.sample&&c.visits.length);if(!real)return"";const old=!S.lastBackup||(Date.now()-new Date(S.lastBackup))/864e5>30;return old?`<button class="bk-note" id="bkNote"><b>バックアップ</b> ${S.lastBackup?"前回から30日以上たっています":"まだ保存していません"}。ここから保存できます →</button>`:""})()}
+  ${(()=>{if(!CLOUD.on||!LOCAL_S)return"";const n=LOCAL_S.customers.filter(c=>!c.sample&&c.visits.length).length;let done=false;try{done=localStorage.getItem("mt-moved")==="1"}catch(e){}if(!n||done)return"";return `<button class="bk-note" id="mvNote"><b>以前の記録</b> このスマホに、ログイン前の記録が${n}名分あります。ここから共有に追加できます →</button>`})()}
   ${(()=>{const it=galItems("back",true);if(!it.length)return"";const t=it.slice(0,3).map(x=>`<img src="${srcOf(angPh(x.B,"back"))}" alt="">`).join("");return `<button class="col-btn" id="colBtn"><span class="thumbs">${t}</span><span><b>コレクション</b><span>ビフォアアフター ${it.length}件を一覧で見る</span></span><span class="go">›</span></button>`})()}
   <section class="section">
     <div class="sec-head"><div><div class="eyebrow">Minus Ten Treatment Record</div><h2 class="h-big">施術記録</h2></div><span class="muted num">${S.customers.length}名</span></div>
@@ -274,6 +288,7 @@ function renderList(){
       const c={id:uid(),name:n,visits:[]};S.customers.unshift(c);save();openCustomer(c.id)}};
   $("#setBtn").onclick=openSettings;
   if($("#colBtn"))$("#colBtn").onclick=()=>openGallery();
+  if($("#mvNote"))$("#mvNote").onclick=openSettings;
   if($("#bkNote"))$("#bkNote").onclick=openSettings;
 }
 function openCustomer(id){view={name:"detail",cid:id,a:0,b:0,angle:"back"};const c=cust();view.b=Math.max(0,c.visits.length-1);render();scrollTo(0,0)}
@@ -623,7 +638,7 @@ function ensureFirebase(){
     firebase.initializeApp(FIREBASE_CONFIG);
     CLOUD.auth=firebase.auth();CLOUD.db=firebase.firestore();
     try{await CLOUD.db.enablePersistence({synchronizeTabs:true})}catch(e){}
-    CLOUD.auth.onAuthStateChanged(u=>{if(u)enterCloud(u);else if(CLOUD.on)exitCloud()});
+    CLOUD.auth.onAuthStateChanged(u=>{if(u){hideGate();enterCloud(u)}else{if(CLOUD.on){location.reload();return}showGate("login")}});
   })();
   fbReady.catch(()=>{fbReady=null});
   return fbReady;
@@ -744,11 +759,36 @@ function bindCloudSection(){
   };
   if($("#upBtn"))$("#upBtn").onclick=()=>{const plan=planMerge(LOCAL_S);
     $("#upArea").innerHTML=`<div class="confirm" style="border-color:var(--line)"><div>新しいお客様 <b>${plan.newC}名</b>、追加される来店記録 <b>${plan.addV}回分</b>を共有に追加します。同じお名前のお客様は1人にまとめます。</div><div class="row2"><button class="btn ghost sm" id="upN">やめる</button><button class="btn sm" id="upY">追加する</button></div></div>`;
-    $("#upN").onclick=openSettings;$("#upY").onclick=()=>{applyMerge(LOCAL_S);sortCustomers();save();closeSheet();render();toast(`${plan.addV}回分の記録を共有に追加しました`)}};
+    $("#upN").onclick=openSettings;$("#upY").onclick=()=>{try{localStorage.setItem("mt-moved","1")}catch(e){}applyMerge(LOCAL_S);sortCustomers();save();closeSheet();render();toast(`${plan.addV}回分の記録を共有に追加しました`)}};
   if($("#loBtn"))$("#loBtn").onclick=()=>{$("#loArea").innerHTML=`<div class="confirm"><div>ログアウトすると、このスマホでは共有の写真が見られなくなります（共有の記録自体は消えません）。</div><div class="row2"><button class="btn ghost sm" id="loN">やめる</button><button class="btn danger sm" id="loY">ログアウト</button></div></div>`;
     $("#loN").onclick=openSettings;$("#loY").onclick=cloudLogout};
 }
 
+
+// ---------- login gate (an account is required to use the app) ----------
+function showGate(mode,msg){
+  const g=$("#gate");g.hidden=false;document.body.classList.add("gated");
+  if(mode==="loading"){g.innerHTML=`<div class="gate-in"><img class="logo" src="${LOGO}" alt="マイナステン"><p class="gate-wait">読み込み中…</p></div>`;return}
+  if(mode==="offline"){g.innerHTML=`<div class="gate-in"><img class="logo" src="${LOGO}" alt="マイナステン"><p class="gate-wait">読み込めませんでした。インターネットにつながっているか確認して、もう一度開いてください。</p><button class="btn block" id="gRetry">もう一度読み込む</button></div>`;$("#gRetry").onclick=()=>location.reload();return}
+  g.innerHTML=`<form class="gate-in" id="gForm" autocomplete="on">
+    <img class="logo" src="${LOGO}" alt="マイナステン">
+    <figure class="gate-hero"><img src="${BANNER}" alt="マイナステントリートメントのビフォアアフター事例"></figure>
+    <div><div class="eyebrow">Minus Ten Treatment Record</div><h1 class="gate-title">施術記録にログイン</h1></div>
+    <div class="field"><label for="gId">サロンID</label><input id="gId" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="例：attina" required></div>
+    <div class="field"><label for="gPw">パスワード</label><input id="gPw" name="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn block" id="gBtn" type="submit">ログイン</button>
+    <p class="note gate-err" id="gMsg" ${msg?"":"hidden"}>${esc(msg||"")}</p>
+    <p class="note">サロンIDとパスワードは、ユーフォリオからの案内をご確認ください。一度ログインすると、次からは自動でログインします。</p>
+    <a class="gate-link" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">使い方を見る ›</a>
+  </form>`;
+  $("#gForm").onsubmit=async e=>{e.preventDefault();const id=$("#gId").value.trim(),pw=$("#gPw").value,b=$("#gBtn"),m=$("#gMsg");
+    if(!id||!pw)return;b.disabled=true;b.textContent="ログインしています…";m.hidden=true;
+    try{await cloudLogin(id,pw)}
+    catch(err){const c=err&&err.code||"";m.hidden=false;
+      m.textContent=/network/.test(c)?"インターネットにつながっているか確認してください。":/too-many/.test(c)?"何度も間違えたため、しばらくログインできません。少し時間をおいてください。":"サロンIDかパスワードが違います。";
+      b.disabled=false;b.textContent="ログイン"}};
+}
+function hideGate(){const g=$("#gate");g.hidden=true;g.innerHTML="";document.body.classList.remove("gated")}
 
 // ---------- merge another staff member's backup ----------
 const normName=n=>String(n||"").replace(/[\s　]+/g,"").replace(/様$/,"");
@@ -779,7 +819,7 @@ function openSettings(){
       <button class="btn block" id="ss">保存</button>
     </section>
     ${cloudSectionHTML()}
-    <section class="section"><h2 style="font-size:16px">バックアップ</h2>
+    <section class="section local-only"><h2 style="font-size:16px">バックアップ</h2>
       <p class="note" style="margin:0">写真と記録はこのスマホの中だけに保存されています。機種変更やデータの削除に備えて、月に1回ほどバックアップを保存してください。</p>
       <p class="num" style="margin:0;font-size:13px">最後のバックアップ：<b>${S.lastBackup?S.lastBackup.replace(/-0?/g,"/"):"まだ保存していません"}</b></p>
       <button class="btn block" id="bkSave">バックアップを保存</button>
@@ -788,7 +828,7 @@ function openSettings(){
       <div id="bkMsg"></div>
       <p class="note" style="margin:0">iPhoneは共有画面で「"ファイル"に保存」を選びます。Androidは「ダウンロード」フォルダに保存されます。新しいスマホでは、このアプリを開いて「バックアップから戻す」で保存したファイルを選びます。「バックアップから戻す」は今の記録と置き換わります。</p>
     </section>
-    <section class="section"><h2 style="font-size:16px">スタッフの記録をまとめる</h2>
+    <section class="section local-only"><h2 style="font-size:16px">スタッフの記録をまとめる</h2>
       <p class="note" style="margin:0">他のスタッフが保存したバックアップファイルを選ぶと、<b>今の記録に追加</b>します。今ある写真や記録は消えません。</p>
       <ol class="steps">
         <li>各スタッフが「バックアップを保存」を押し、共有画面で<b>LINE</b>を選んで、お店のグループやまとめ役のスタッフに送る</li>
@@ -806,16 +846,16 @@ function openSettings(){
       <div id="rs"><button class="linkbtn warn" id="rsb">すべて消してサンプルに戻す</button></div></section></div>`);
   $("#cx").onclick=closeSheet;
   bindCloudSection();
-  if(CLOUD.on){const l=document.querySelector('label[for="bkFile"]');if(l)l.remove();const r=$("#rs");if(r)r.closest(".section").remove()}
+  if(CLOUD.on){document.querySelectorAll(".local-only").forEach(e=>e.remove());const r=$("#rs");if(r)r.closest(".section").remove()}
   $("#ss").onclick=()=>{S.salon=$("#sn").value.trim();save();closeSheet();render();toast("保存しました")};
-  $("#bkSave").onclick=async()=>{const b=$("#bkSave");b.disabled=true;await saveBackup();b.disabled=false;if($("#sheet").hidden===false&&$("#bkSave"))openSettings()};
-  $("#bkFile").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const fr=new FileReader();
+  if($("#bkSave"))$("#bkSave").onclick=async()=>{const b=$("#bkSave");b.disabled=true;await saveBackup();b.disabled=false;if($("#sheet").hidden===false&&$("#bkSave"))openSettings()};
+  if($("#bkFile"))$("#bkFile").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const fr=new FileReader();
     fr.onload=()=>{let st=null,at="";try{const o=JSON.parse(fr.result);st=o.state||o;at=o.savedAt?o.savedAt.slice(0,10).replace(/-0?/g,"/"):"";if(!st||!Array.isArray(st.customers))throw 0}catch(err){$("#bkMsg").innerHTML='<p class="note" style="color:var(--warn);margin:0">このファイルはバックアップとして読み込めませんでした。「minusten-backup-日付.json」のファイルを選んでください。</p>';return}
       $("#bkMsg").innerHTML=`<div class="confirm"><div>${st.customers.length}名分の記録${at?"（"+at+" 保存）":""}を読み込みます。今このスマホにある記録は置き換わります。</div><div class="row2"><button class="btn ghost sm" id="bkN">やめる</button><button class="btn danger sm" id="bkY">読み込む</button></div></div>`;
       $("#bkN").onclick=()=>{$("#bkMsg").innerHTML=""};
       $("#bkY").onclick=()=>{S=migrate(st);save();closeSheet();view={name:"list"};render();toast("バックアップから戻しました")}};
     fr.readAsText(f)};
-  $("#mgFile").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;$("#mgMsg").innerHTML='<p class="note" style="margin:0">読み込んでいます…</p>';const fr=new FileReader();
+  if($("#mgFile"))$("#mgFile").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;$("#mgMsg").innerHTML='<p class="note" style="margin:0">読み込んでいます…</p>';const fr=new FileReader();
     fr.onload=()=>{let st=null;try{const o=JSON.parse(fr.result);st=o.state||o;if(!st||!Array.isArray(st.customers))throw 0}catch(err){$("#mgMsg").innerHTML='<p class="note" style="color:var(--warn);margin:0">このファイルはバックアップとして読み込めませんでした。「minusten-backup-日付.json」のファイルを選んでください。</p>';return}
       const plan=planMerge(st);
       if(!plan.newC&&!plan.addV){$("#mgMsg").innerHTML='<p class="note" style="margin:0">このファイルの記録は、すべてこのスマホに入っています。追加するものはありません。</p>';return}
@@ -892,7 +932,11 @@ if(IN_LINE&&!/openExternalBrowser=1/.test(location.search)){location.replace(loc
 function inAppBanner(){if(!IN_APP||$("#iab"))return;const isA=/Android/i.test(UA);
   document.body.insertAdjacentHTML("afterbegin",`<div id="iab" class="iab"><b>${isA?"Chrome":"Safari"}で開いてください</b>アプリ内の画面では、撮影やLINEへの送信がうまく動きません。右上（または右下）のメニューから「${isA?"他のアプリで開く":"Safariで開く"}」「ブラウザで開く」を選んでください。</div>`)}
 inAppBanner();
-(async()=>{S=migrate(await load()||defaultState());LOCAL_S=S;render();if(FIREBASE_CONFIG&&cloudFlag())ensureFirebase().catch(()=>{})})();
+(async()=>{
+  if(FIREBASE_CONFIG)showGate("loading");
+  S=migrate(await load()||defaultState());LOCAL_S=S;render();
+  if(FIREBASE_CONFIG)ensureFirebase().catch(()=>showGate("offline"));
+})();
 })();
 </script>
 
