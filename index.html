@@ -221,6 +221,9 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .confirm{padding:14px;border:1px solid var(--warn);border-radius:4px;display:grid;gap:10px}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13px;z-index:40}
+.bswitch{display:grid;grid-template-columns:1fr 1fr;margin-top:12px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.bswitch a{display:flex;align-items:center;justify-content:center;height:34px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.04em;text-decoration:none;color:var(--muted)}
+.bswitch a[aria-current="page"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .hero-note{padding:14px;background:var(--surface);border-radius:4px;font-size:13px}
 </style>
 
@@ -283,6 +286,7 @@ function renderList(){
       <div class="meta num">${v?"前回 "+md(v.date):"まだ撮影していません"}</div></div>
       <div class="cnt num">${tcount(c)}<small>回</small></div></button>`}).join("");
   $("#app").innerHTML=`
+  ${CLOUD.on?`<nav class="bswitch" aria-label="アプリの切り替え"><a href="/minusten-record/" aria-current="page">マイナステン</a><a href="/choiku-record/" >超育</a></nav>`:""}
   <header class="brandbar"><img class="logo" src="${LOGO}" alt="マイナステン"><button class="iconbtn" id="setBtn">${FIREBASE_CONFIG?"設定・共有":"設定・バックアップ"}</button></header>
   ${CLOUD.on?`<div class="cloud-chip" id="cloudChip">${chipHTML()}</div>`:""}
   <figure class="hero"><img src="${BANNER}" alt="マイナステントリートメントのビフォアアフター事例" width="1200" height="677"></figure>
