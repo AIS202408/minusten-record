@@ -642,6 +642,7 @@ function enterCloud(u){
   S={salon:"",sampleV2:true,cloud:true,customers:sampleCustomers()};
   view={name:"list"};closeSheet();render();
   const base=salonRef(),un=CLOUD.unsubs,err=e=>{setCloudState("error");console.warn(e)};
+  base.set({loginId:CLOUD.id,lastActive:Date.now()},{merge:true}).catch(()=>{});
   un.push(base.onSnapshot(d=>{const x=d.data()||{};S.salon=x.salonName||"";CLOUD.synced.s=S.salon;CLOUD.loaded.s=1;schedRender()},err));
   un.push(base.collection("customers").onSnapshot(qs=>{
     qs.docChanges().forEach(ch=>{const id=ch.doc.id,d=ch.doc.data();
@@ -658,7 +659,7 @@ function enterCloud(u){
       let v=owner&&owner.visits.find(w=>w.id===id);
       if(!v){v={id};fillPhotos(v)}
       Object.assign(v,{date:d.date||"",before:!!d.before,memo:d.memo||"",created:d.created||0});
-      CLOUD.synced.v[id]=JSON.stringify({c:d.customerId,date:v.date,before:v.before,memo:v.memo});
+      CLOUD.synced.v[id]=JSON.stringify({c:d.customerId,date:v.date,before:v.before,memo:v.memo,angles:d.angles||[]});
       const c=S.customers.find(x=>x.id===d.customerId);
       if(c){if(!c.visits.includes(v)){if(owner&&owner!==c)owner.visits=owner.visits.filter(w=>w!==v);c.visits.push(v)}sortV(c)}
       else{(CLOUD.orphanV[d.customerId]=CLOUD.orphanV[d.customerId]||{})[id]=v}
@@ -697,21 +698,23 @@ function cloudSync(){
 function syncOnce(){
   const base=salonRef(),sy=CLOUD.synced,fail=e=>{console.warn(e);setCloudState("error");if(!CLOUD.errShown){CLOUD.errShown=true;toast("クラウドに保存できませんでした。インターネットの接続を確認してください")}};
   if(sy.s!==S.salon){base.set({salonName:S.salon||""},{merge:true}).catch(fail);sy.s=S.salon}
-  const seenC=new Set,seenV=new Set,seenP=new Set;
+  const seenC=new Set,seenV=new Set,seenP=new Set;let dirty=false;
   S.customers.forEach(c=>{if(c.sample)return;seenC.add(c.id);
     if(!c.created)c.created=Date.now();
     const cm=JSON.stringify({name:c.name});
-    if(sy.c[c.id]!==cm){base.collection("customers").doc(c.id).set({name:c.name,created:c.created}).catch(fail);sy.c[c.id]=cm}
+    if(sy.c[c.id]!==cm){base.collection("customers").doc(c.id).set({name:c.name,created:c.created}).catch(fail);sy.c[c.id]=cm;dirty=true}
     c.visits.forEach(v=>{seenV.add(v.id);if(!v.created)v.created=Date.now();
-      const vm=JSON.stringify({c:c.id,date:v.date,before:!!v.before,memo:v.memo||""});
-      if(sy.v[v.id]!==vm){base.collection("visits").doc(v.id).set({customerId:c.id,date:v.date||"",before:!!v.before,memo:v.memo||"",created:v.created}).catch(fail);sy.v[v.id]=vm}
+      const angles=ANGLES.map(([a])=>a).filter(a=>{const d=v[PF[a]];return d&&!String(d).startsWith("sample:")});
+      const vm=JSON.stringify({c:c.id,date:v.date,before:!!v.before,memo:v.memo||"",angles});
+      if(sy.v[v.id]!==vm){base.collection("visits").doc(v.id).set({customerId:c.id,date:v.date||"",before:!!v.before,memo:v.memo||"",angles,created:v.created}).catch(fail);sy.v[v.id]=vm;dirty=true}
       ANGLES.forEach(([a])=>{const data=v[PF[a]],pid=v.id+"_"+a;
         if(!data||String(data).startsWith("sample:"))return;seenP.add(pid);
         if(sy.p[pid]!==data){base.collection("photos").doc(pid).set({vid:v.id,angle:a,data}).catch(fail);sy.p[pid]=data;CLOUD.P[pid]=data}})});
   });
   Object.keys(sy.p).forEach(id=>{if(!seenP.has(id)){base.collection("photos").doc(id).delete().catch(fail);delete sy.p[id];delete CLOUD.P[id]}});
   Object.keys(sy.v).forEach(id=>{if(!seenV.has(id)){base.collection("visits").doc(id).delete().catch(fail);delete sy.v[id]}});
-  Object.keys(sy.c).forEach(id=>{if(!seenC.has(id)){base.collection("customers").doc(id).delete().catch(fail);delete sy.c[id]}});
+  Object.keys(sy.c).forEach(id=>{if(!seenC.has(id)){base.collection("customers").doc(id).delete().catch(fail);delete sy.c[id];dirty=true}});
+  if(dirty){const n=Date.now();if(n-(CLOUD.lastAct||0)>60000){CLOUD.lastAct=n;base.set({lastActive:n},{merge:true}).catch(()=>{})}}
 }
 function cloudSectionHTML(){
   if(!FIREBASE_CONFIG)return"";
