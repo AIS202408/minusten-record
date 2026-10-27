@@ -263,7 +263,7 @@ function renderList(){
   ${(()=>{const it=galItems("back",true);if(!it.length)return"";const t=it.slice(0,3).map(x=>`<img src="${srcOf(angPh(x.B,"back"))}" alt="">`).join("");return `<button class="col-btn" id="colBtn"><span class="thumbs">${t}</span><span><b>コレクション</b><span>ビフォアアフター ${it.length}件を一覧で見る</span></span><span class="go">›</span></button>`})()}
   <section class="section">
     <div class="sec-head"><div><div class="eyebrow">Minus Ten Treatment Record</div><h2 class="h-big">施術記録</h2></div><span class="muted num">${S.customers.length}名</span></div>
-    <p class="lead">施術前（ビフォア）と毎回の仕上がりを同じ角度で残し、フォルムの変化をお客様と一緒に確認します。<span class="muted">サンプルのお客様2名は試し用です。</span></p>
+    <p class="lead">施術前（ビフォア）と毎回の仕上がりを同じ角度で残し、フォルムの変化をお客様と一緒に確認します。<span class="muted">サンプルのお客様2名は試し用です。</span> <a href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener" style="color:var(--gold-ink);font-weight:700;white-space:nowrap">使い方を見る ›</a></p>
     <div class="clist">${rows||'<p class="muted">お客様を追加してください。</p>'}</div>
     <div id="addArea"><button class="btn ghost block" id="addBtn">＋ お客様を追加</button></div>
   </section>`;
@@ -774,6 +774,7 @@ function applyMerge(st){mergeWork(st,true)}
 // ---------- settings ----------
 function openSettings(){
   openSheet(`<div class="app"><header class="top"><button class="iconbtn" id="cx">閉じる</button><h1>設定</h1></header>
+    <a class="btn ghost block" style="margin-top:14px;text-decoration:none" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">使い方を見る（画面の写真つき）</a>
     <section class="section">
       <div class="field"><label for="sn">サロン名（送る画像に入ります）</label><input id="sn" value="${esc(S.salon)}" placeholder="例：Hair Salon ○○"></div>
       <button class="btn block" id="ss">保存</button>
