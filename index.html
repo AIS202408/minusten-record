@@ -830,13 +830,14 @@ function showGate(mode,msg){
   g.innerHTML=`<form class="gate-in" id="gForm" autocomplete="on">
     <img class="logo" src="${LOGO}" alt="マイナステン">
     <figure class="gate-hero"><img src="${BANNER}" alt="マイナステントリートメントのビフォアアフター事例"></figure>
+    <button class="vid-card" type="button" data-video="0" style="margin-top:0"><span class="vid-play" aria-hidden="true">▶</span><span><b>はじめての方は動画を見る</b><span>ログインしなくても見られます（約1分半）</span></span></button>
     <div><div class="eyebrow">Minus Ten Treatment Record</div><h1 class="gate-title">施術記録にログイン</h1></div>
     <div class="field"><label for="gId">サロンID</label><input id="gId" name="username" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="例：attina" required></div>
     <div class="field"><label for="gPw">パスワード</label><input id="gPw" name="password" type="password" autocomplete="current-password" required></div>
     <button class="btn block" id="gBtn" type="submit">ログイン</button>
     <p class="note gate-err" id="gMsg" ${msg?"":"hidden"}>${esc(msg||"")}</p>
     <p class="note">サロンIDとパスワードは、ユーフォリオからの案内をご確認ください。一度ログインすると、次からは自動でログインします。</p>
-    <div class="gate-links"><button class="gate-link" type="button" data-video="0">▶ 動画で見る</button><a class="gate-link" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">使い方を見る ›</a></div>
+    <div class="gate-links"><a class="gate-link" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">使い方を見る ›</a></div>
   </form>`;
   $("#gForm").onsubmit=async e=>{e.preventDefault();const id=$("#gId").value.trim(),pw=$("#gPw").value,b=$("#gBtn"),m=$("#gMsg");
     if(!id||!pw)return;b.disabled=true;b.textContent="ログインしています…";m.hidden=true;
