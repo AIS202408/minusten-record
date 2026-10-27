@@ -118,6 +118,12 @@ button{cursor:pointer}
 @media (prefers-reduced-motion:reduce){.flash{animation:none;outline:3px solid var(--orange)}}
 .cam-hint{display:flex;gap:10px;align-items:flex-start;margin:0;padding:10px 12px;border-radius:6px;background:var(--surface);font-size:13px;line-height:1.6}
 .ok-dot{flex:none;width:30px;height:30px;border-radius:50%;background:#fff;border:3px solid #333;color:#222;display:grid;place-items:center;font-size:14px;font-weight:700}
+.steps{margin:0;padding-left:1.3em;font-size:13px;display:grid;gap:4px}
+.cloud-chip{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:6px 12px;border-radius:999px;background:var(--surface);font-size:12px;width:max-content;max-width:100%}
+.cloud-chip .cs{color:var(--muted)}
+.cloud-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--good);flex:none}
+.cloud-chip .dot.busy{background:var(--orange)}
+.cloud-chip .dot.err{background:var(--warn)}
 /* list */
 .clist{display:grid}
 .crow{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
@@ -226,7 +232,7 @@ function migrate(st){if(!st.sampleV2){st.customers=sampleCustomers().concat(st.c
 let S=null,mem=null;
 function openDB(){return new Promise((res,rej)=>{try{const r=indexedDB.open("hair-ba",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 async function load(){try{const db=await openDB();return await new Promise(res=>{const q=db.transaction("kv").objectStore("kv").get("state");q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)})}catch(e){return null}}
-async function save(){try{const db=await openDB();db.transaction("kv","readwrite").objectStore("kv").put(JSON.parse(JSON.stringify(S)),"state")}catch(e){}}
+async function save(){if(CLOUD.on){cloudSync();return}LOCAL_S=S;try{const db=await openDB();db.transaction("kv","readwrite").objectStore("kv").put(JSON.parse(JSON.stringify(S)),"state")}catch(e){}}
 
 // ---------- view state ----------
 let view={name:"list",cid:null,a:0,b:0,angle:"back"};
@@ -250,9 +256,10 @@ function renderList(){
       <div class="meta num">${v?"前回 "+md(v.date):"まだ撮影していません"}</div></div>
       <div class="cnt num">${tcount(c)}<small>回</small></div></button>`}).join("");
   $("#app").innerHTML=`
-  <header class="brandbar"><img class="logo" src="${LOGO}" alt="マイナステン"><button class="iconbtn" id="setBtn">設定・バックアップ</button></header>
+  <header class="brandbar"><img class="logo" src="${LOGO}" alt="マイナステン"><button class="iconbtn" id="setBtn">${FIREBASE_CONFIG?"設定・共有":"設定・バックアップ"}</button></header>
+  ${CLOUD.on?`<div class="cloud-chip" id="cloudChip">${chipHTML()}</div>`:""}
   <figure class="hero"><img src="${BANNER}" alt="マイナステントリートメントのビフォアアフター事例" width="1200" height="677"></figure>
-  ${(()=>{const real=S.customers.some(c=>!c.sample&&c.visits.length);if(!real)return"";const old=!S.lastBackup||(Date.now()-new Date(S.lastBackup))/864e5>30;return old?`<button class="bk-note" id="bkNote"><b>バックアップ</b> ${S.lastBackup?"前回から30日以上たっています":"まだ保存していません"}。ここから保存できます →</button>`:""})()}
+  ${(()=>{const real=!CLOUD.on&&S.customers.some(c=>!c.sample&&c.visits.length);if(!real)return"";const old=!S.lastBackup||(Date.now()-new Date(S.lastBackup))/864e5>30;return old?`<button class="bk-note" id="bkNote"><b>バックアップ</b> ${S.lastBackup?"前回から30日以上たっています":"まだ保存していません"}。ここから保存できます →</button>`:""})()}
   ${(()=>{const it=galItems("back",true);if(!it.length)return"";const t=it.slice(0,3).map(x=>`<img src="${srcOf(angPh(x.B,"back"))}" alt="">`).join("");return `<button class="col-btn" id="colBtn"><span class="thumbs">${t}</span><span><b>コレクション</b><span>ビフォアアフター ${it.length}件を一覧で見る</span></span><span class="go">›</span></button>`})()}
   <section class="section">
     <div class="sec-head"><div><div class="eyebrow">Minus Ten Treatment Record</div><h2 class="h-big">施術記録</h2></div><span class="muted num">${S.customers.length}名</span></div>
@@ -598,6 +605,169 @@ async function openShare(){
   refresh();
 }
 
+// ---------- cloud sharing (Firebase: one login per salon, shared by all staff) ----------
+const FIREBASE_CONFIG={apiKey:"AIzaSyDLmfVd_NB2jhf1JW0bYU3LV-Nn4I7It_8",authDomain:"minusten-record.firebaseapp.com",projectId:"minusten-record",storageBucket:"minusten-record.firebasestorage.app",messagingSenderId:"580936800601",appId:"1:580936800601:web:53448d29ba99ad97031448"};
+const SALON_DOMAIN="salon.youforio.com",FB_VER="10.14.1";
+const CLOUD={on:false,uid:null,id:"",db:null,auth:null,unsubs:[],loaded:{s:0,c:0,v:0,p:0},state:"",syncing:false,again:false,errShown:false,
+  synced:{s:null,c:{},v:{},p:{}},P:{},orphanV:{}};
+let LOCAL_S=null,fbReady=null;
+const PF={back:"photo",right:"photoR",left:"photoL"};
+const cloudFlag=v=>{try{if(v===undefined)return localStorage.getItem("mt-cloud")==="1";v?localStorage.setItem("mt-cloud","1"):localStorage.removeItem("mt-cloud")}catch(e){return false}};
+const loadScript=src=>new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("load"));document.head.appendChild(s)});
+function ensureFirebase(){
+  if(!FIREBASE_CONFIG)return Promise.reject(new Error("noconfig"));
+  if(fbReady)return fbReady;
+  fbReady=(async()=>{
+    const b=`https://www.gstatic.com/firebasejs/${FB_VER}/`;
+    await loadScript(b+"firebase-app-compat.js");await loadScript(b+"firebase-auth-compat.js");await loadScript(b+"firebase-firestore-compat.js");
+    firebase.initializeApp(FIREBASE_CONFIG);
+    CLOUD.auth=firebase.auth();CLOUD.db=firebase.firestore();
+    try{await CLOUD.db.enablePersistence({synchronizeTabs:true})}catch(e){}
+    CLOUD.auth.onAuthStateChanged(u=>{if(u)enterCloud(u);else if(CLOUD.on)exitCloud()});
+  })();
+  fbReady.catch(()=>{fbReady=null});
+  return fbReady;
+}
+const salonRef=()=>CLOUD.db.collection("salons").doc(CLOUD.uid);
+let rTimer=0;const schedRender=()=>{cancelAnimationFrame(rTimer);rTimer=requestAnimationFrame(()=>render())};
+function sortCustomers(){S.customers.sort((a,b)=>((a.sample?1:0)-(b.sample?1:0))||((b.created||0)-(a.created||0)))}
+function setCloudState(t){CLOUD.state=t;const el=$("#cloudChip");if(el)el.innerHTML=chipHTML()}
+function chipHTML(){const ld=CLOUD.loaded,loading=!(ld.s&&ld.c&&ld.v&&ld.p);
+  return `<span class="dot ${loading||CLOUD.state==="saving"?"busy":CLOUD.state==="error"?"err":""}"></span>共有中：${esc(CLOUD.id)}<span class="cs">${loading?"読み込み中…":CLOUD.state==="saving"?"保存中…":CLOUD.state==="error"?"保存できませんでした":"最新です"}</span>`}
+function fillPhotos(v){ANGLES.forEach(([a])=>{const d=CLOUD.P[v.id+"_"+a];v[PF[a]]=d||null})}
+function enterCloud(u){
+  if(CLOUD.on&&CLOUD.uid===u.uid)return;
+  CLOUD.on=true;CLOUD.uid=u.uid;CLOUD.id=(u.email||"").replace("@"+SALON_DOMAIN,"");
+  CLOUD.loaded={s:0,c:0,v:0,p:0};CLOUD.synced={s:null,c:{},v:{},p:{}};CLOUD.P={};CLOUD.orphanV={};
+  S={salon:"",sampleV2:true,cloud:true,customers:sampleCustomers()};
+  view={name:"list"};closeSheet();render();
+  const base=salonRef(),un=CLOUD.unsubs,err=e=>{setCloudState("error");console.warn(e)};
+  un.push(base.onSnapshot(d=>{const x=d.data()||{};S.salon=x.salonName||"";CLOUD.synced.s=S.salon;CLOUD.loaded.s=1;schedRender()},err));
+  un.push(base.collection("customers").onSnapshot(qs=>{
+    qs.docChanges().forEach(ch=>{const id=ch.doc.id,d=ch.doc.data();
+      if(ch.type==="removed"){S.customers=S.customers.filter(c=>c.id!==id);delete CLOUD.synced.c[id];return}
+      let c=S.customers.find(x=>x.id===id);if(!c){c={id,name:d.name||"",visits:[]};S.customers.push(c)}
+      c.name=d.name||"";c.created=d.created||0;CLOUD.synced.c[id]=JSON.stringify({name:c.name});
+      const o=CLOUD.orphanV[id];if(o){Object.values(o).forEach(v=>{if(!c.visits.some(w=>w.id===v.id))c.visits.push(v)});delete CLOUD.orphanV[id];sortV(c)}
+    });
+    sortCustomers();CLOUD.loaded.c=1;schedRender()},err));
+  un.push(base.collection("visits").onSnapshot(qs=>{
+    qs.docChanges().forEach(ch=>{const id=ch.doc.id,d=ch.doc.data();
+      const owner=S.customers.find(c=>c.visits.some(v=>v.id===id));
+      if(ch.type==="removed"){if(owner)owner.visits=owner.visits.filter(v=>v.id!==id);Object.values(CLOUD.orphanV).forEach(o=>delete o[id]);delete CLOUD.synced.v[id];return}
+      let v=owner&&owner.visits.find(w=>w.id===id);
+      if(!v){v={id};fillPhotos(v)}
+      Object.assign(v,{date:d.date||"",before:!!d.before,memo:d.memo||"",created:d.created||0});
+      CLOUD.synced.v[id]=JSON.stringify({c:d.customerId,date:v.date,before:v.before,memo:v.memo});
+      const c=S.customers.find(x=>x.id===d.customerId);
+      if(c){if(!c.visits.includes(v)){if(owner&&owner!==c)owner.visits=owner.visits.filter(w=>w!==v);c.visits.push(v)}sortV(c)}
+      else{(CLOUD.orphanV[d.customerId]=CLOUD.orphanV[d.customerId]||{})[id]=v}
+    });
+    CLOUD.loaded.v=1;schedRender()},err));
+  un.push(base.collection("photos").onSnapshot(qs=>{
+    qs.docChanges().forEach(ch=>{const id=ch.doc.id,d=ch.doc.data(),vid=d.vid||id.slice(0,id.lastIndexOf("_")),a=d.angle||id.slice(id.lastIndexOf("_")+1);
+      if(ch.type==="removed"){delete CLOUD.P[id];delete CLOUD.synced.p[id]}else{CLOUD.P[id]=d.data;CLOUD.synced.p[id]=d.data}
+      for(const c of S.customers){const v=c.visits.find(w=>w.id===vid);if(v){v[PF[a]]=CLOUD.P[id]||null;break}}
+      Object.values(CLOUD.orphanV).forEach(o=>{if(o[vid])o[vid][PF[a]]=CLOUD.P[id]||null});
+    });
+    CLOUD.loaded.p=1;schedRender()},err));
+}
+function exitCloud(){
+  CLOUD.unsubs.forEach(f=>{try{f()}catch(e){}});CLOUD.unsubs=[];CLOUD.on=false;CLOUD.uid=null;
+  S=LOCAL_S;view={name:"list"};closeSheet();render();
+}
+async function cloudLogin(id,pw){
+  await ensureFirebase();
+  const email=id.includes("@")?id:`${id}@${SALON_DOMAIN}`;
+  await CLOUD.auth.signInWithEmailAndPassword(email,pw);
+  cloudFlag(true);
+}
+async function cloudLogout(){
+  try{CLOUD.unsubs.forEach(f=>f());CLOUD.unsubs=[];await CLOUD.auth.signOut()}catch(e){}
+  try{await CLOUD.db.terminate();await CLOUD.db.clearPersistence()}catch(e){}
+  cloudFlag(false);location.reload();
+}
+function cloudSync(){
+  if(!CLOUD.on)return;
+  if(CLOUD.syncing){CLOUD.again=true;return}
+  CLOUD.syncing=true;setCloudState("saving");
+  try{do{CLOUD.again=false;syncOnce()}while(CLOUD.again)}finally{CLOUD.syncing=false}
+  CLOUD.db.waitForPendingWrites().then(()=>{if(CLOUD.state!=="error")setCloudState("")}).catch(()=>{});
+}
+function syncOnce(){
+  const base=salonRef(),sy=CLOUD.synced,fail=e=>{console.warn(e);setCloudState("error");if(!CLOUD.errShown){CLOUD.errShown=true;toast("クラウドに保存できませんでした。インターネットの接続を確認してください")}};
+  if(sy.s!==S.salon){base.set({salonName:S.salon||""},{merge:true}).catch(fail);sy.s=S.salon}
+  const seenC=new Set,seenV=new Set,seenP=new Set;
+  S.customers.forEach(c=>{if(c.sample)return;seenC.add(c.id);
+    if(!c.created)c.created=Date.now();
+    const cm=JSON.stringify({name:c.name});
+    if(sy.c[c.id]!==cm){base.collection("customers").doc(c.id).set({name:c.name,created:c.created}).catch(fail);sy.c[c.id]=cm}
+    c.visits.forEach(v=>{seenV.add(v.id);if(!v.created)v.created=Date.now();
+      const vm=JSON.stringify({c:c.id,date:v.date,before:!!v.before,memo:v.memo||""});
+      if(sy.v[v.id]!==vm){base.collection("visits").doc(v.id).set({customerId:c.id,date:v.date||"",before:!!v.before,memo:v.memo||"",created:v.created}).catch(fail);sy.v[v.id]=vm}
+      ANGLES.forEach(([a])=>{const data=v[PF[a]],pid=v.id+"_"+a;
+        if(!data||String(data).startsWith("sample:"))return;seenP.add(pid);
+        if(sy.p[pid]!==data){base.collection("photos").doc(pid).set({vid:v.id,angle:a,data}).catch(fail);sy.p[pid]=data;CLOUD.P[pid]=data}})});
+  });
+  Object.keys(sy.p).forEach(id=>{if(!seenP.has(id)){base.collection("photos").doc(id).delete().catch(fail);delete sy.p[id];delete CLOUD.P[id]}});
+  Object.keys(sy.v).forEach(id=>{if(!seenV.has(id)){base.collection("visits").doc(id).delete().catch(fail);delete sy.v[id]}});
+  Object.keys(sy.c).forEach(id=>{if(!seenC.has(id)){base.collection("customers").doc(id).delete().catch(fail);delete sy.c[id]}});
+}
+function cloudSectionHTML(){
+  if(!FIREBASE_CONFIG)return"";
+  if(!CLOUD.on)return `<section class="section"><h2 style="font-size:16px">スタッフで共有する</h2>
+      <p class="note" style="margin:0">お店の<b>サロンID</b>とパスワードでログインすると、同じIDでログインしたスタッフ全員で、写真と記録が自動で共有されます。保存や送る操作はいりません。</p>
+      <div class="field"><label for="lgId">サロンID</label><input id="lgId" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="例：salon001"></div>
+      <div class="field"><label for="lgPw">パスワード</label><input id="lgPw" type="password" autocomplete="current-password"></div>
+      <button class="btn block" id="lgBtn">ログインして共有を始める</button>
+      <p class="note" id="lgMsg" style="margin:0" hidden></p>
+      <p class="note" style="margin:0">サロンIDはユーフォリオから発行されます。</p></section>`;
+  const loc=(LOCAL_S&&LOCAL_S.customers||[]).filter(c=>!c.sample&&c.visits.length);
+  return `<section class="section"><h2 style="font-size:16px">スタッフで共有中</h2>
+      <p class="note" style="margin:0">サロンID <b>${esc(CLOUD.id)}</b> でログインしています。撮った写真と記録は、自動で同じIDのスタッフ全員に共有されます。</p>
+      ${loc.length?`<div id="upArea" style="display:grid;gap:8px"><p class="note" style="margin:0">このスマホには、ログイン前に記録したお客様が <b>${loc.length}名</b> います。</p><button class="btn block" id="upBtn">このスマホの記録を共有に追加する</button></div>`:""}
+      <div id="loArea"><button class="linkbtn" id="loBtn">ログアウト</button></div></section>`;
+}
+function bindCloudSection(){
+  if($("#lgBtn"))$("#lgBtn").onclick=async()=>{
+    const id=$("#lgId").value.trim(),pw=$("#lgPw").value,m=$("#lgMsg"),b=$("#lgBtn");
+    if(!id||!pw){m.hidden=false;m.style.color="var(--warn)";m.textContent="サロンIDとパスワードを入れてください。";return}
+    b.disabled=true;b.textContent="ログインしています…";m.hidden=true;
+    try{await cloudLogin(id,pw);toast("ログインしました。共有を始めます")}
+    catch(e){const c=e&&e.code||"",msg=e&&e.message||"";m.hidden=false;m.style.color="var(--warn)";
+      m.textContent=msg==="load"||msg==="noconfig"?"この画面では共有を使えません。配布用のURL（ホーム画面のアイコン）から開いてください。":
+        /network/.test(c)?"インターネットにつながっているか確認してください。":
+        /too-many/.test(c)?"何度も間違えたため、しばらくログインできません。少し時間をおいてください。":"サロンIDかパスワードが違います。";
+      b.disabled=false;b.textContent="ログインして共有を始める"}
+  };
+  if($("#upBtn"))$("#upBtn").onclick=()=>{const plan=planMerge(LOCAL_S);
+    $("#upArea").innerHTML=`<div class="confirm" style="border-color:var(--line)"><div>新しいお客様 <b>${plan.newC}名</b>、追加される来店記録 <b>${plan.addV}回分</b>を共有に追加します。同じお名前のお客様は1人にまとめます。</div><div class="row2"><button class="btn ghost sm" id="upN">やめる</button><button class="btn sm" id="upY">追加する</button></div></div>`;
+    $("#upN").onclick=openSettings;$("#upY").onclick=()=>{applyMerge(LOCAL_S);sortCustomers();save();closeSheet();render();toast(`${plan.addV}回分の記録を共有に追加しました`)}};
+  if($("#loBtn"))$("#loBtn").onclick=()=>{$("#loArea").innerHTML=`<div class="confirm"><div>ログアウトすると、このスマホでは共有の写真が見られなくなります（共有の記録自体は消えません）。</div><div class="row2"><button class="btn ghost sm" id="loN">やめる</button><button class="btn danger sm" id="loY">ログアウト</button></div></div>`;
+    $("#loN").onclick=openSettings;$("#loY").onclick=cloudLogout};
+}
+
+
+// ---------- merge another staff member's backup ----------
+const normName=n=>String(n||"").replace(/[\s　]+/g,"").replace(/様$/,"");
+function mergeWork(inc,apply){
+  const r={newC:0,updC:0,addV:0,skipB:0};
+  (inc.customers||[]).forEach(ic=>{
+    if(ic.sample||!Array.isArray(ic.visits))return;
+    let lc=S.customers.find(c=>c.id===ic.id)||S.customers.find(c=>!c.sample&&normName(c.name)===normName(ic.name));
+    if(!lc){if(!ic.visits.length&&S.customers.some(c=>normName(c.name)===normName(ic.name)))return;
+      r.newC++;r.addV+=ic.visits.length;if(apply){S.customers.push(JSON.parse(JSON.stringify(ic)))}return}
+    const have=new Set(lc.visits.map(v=>v.id)),hasB=lc.visits.some(v=>v.before);let added=0;
+    ic.visits.forEach(v=>{if(have.has(v.id))return;
+      if(v.before&&hasB){r.skipB++;return}
+      added++;if(apply)lc.visits.push(JSON.parse(JSON.stringify(v)))});
+    if(added){r.updC++;r.addV+=added;if(apply)sortV(lc)}
+  });
+  return r;
+}
+const planMerge=st=>mergeWork(st,false);
+function applyMerge(st){mergeWork(st,true)}
+
 // ---------- settings ----------
 function openSettings(){
   openSheet(`<div class="app"><header class="top"><button class="iconbtn" id="cx">閉じる</button><h1>設定</h1></header>
@@ -605,6 +775,7 @@ function openSettings(){
       <div class="field"><label for="sn">サロン名（送る画像に入ります）</label><input id="sn" value="${esc(S.salon)}" placeholder="例：Hair Salon ○○"></div>
       <button class="btn block" id="ss">保存</button>
     </section>
+    ${cloudSectionHTML()}
     <section class="section"><h2 style="font-size:16px">バックアップ</h2>
       <p class="note" style="margin:0">写真と記録はこのスマホの中だけに保存されています。機種変更やデータの削除に備えて、月に1回ほどバックアップを保存してください。</p>
       <p class="num" style="margin:0;font-size:13px">最後のバックアップ：<b>${S.lastBackup?S.lastBackup.replace(/-0?/g,"/"):"まだ保存していません"}</b></p>
@@ -612,12 +783,27 @@ function openSettings(){
       <label class="btn ghost block" for="bkFile">バックアップから戻す</label>
       <input type="file" id="bkFile" accept=".json,application/json" hidden>
       <div id="bkMsg"></div>
-      <p class="note" style="margin:0">iPhoneは共有画面で「"ファイル"に保存」を選びます。Androidは「ダウンロード」フォルダに保存されます。新しいスマホでは、このアプリを開いて「バックアップから戻す」で保存したファイルを選びます。</p>
+      <p class="note" style="margin:0">iPhoneは共有画面で「"ファイル"に保存」を選びます。Androidは「ダウンロード」フォルダに保存されます。新しいスマホでは、このアプリを開いて「バックアップから戻す」で保存したファイルを選びます。「バックアップから戻す」は今の記録と置き換わります。</p>
+    </section>
+    <section class="section"><h2 style="font-size:16px">スタッフの記録をまとめる</h2>
+      <p class="note" style="margin:0">他のスタッフが保存したバックアップファイルを選ぶと、<b>今の記録に追加</b>します。今ある写真や記録は消えません。</p>
+      <ol class="steps">
+        <li>各スタッフが「バックアップを保存」を押し、共有画面で<b>LINE</b>を選んで、お店のグループやまとめ役のスタッフに送る</li>
+        <li>まとめ役のスマホでLINEのファイルを開いて保存する（iPhoneは「"ファイル"に保存」）</li>
+        <li>下の「追加で取り込む」でそのファイルを選ぶ</li>
+        <li>まとめ終わったら、まとめ役が「バックアップを保存」して全員に送り返し、全員が「追加で取り込む」と、みんな同じ記録になります</li>
+      </ol>
+      <label class="btn block" for="mgFile">追加で取り込む</label>
+      <input type="file" id="mgFile" accept=".json,application/json" hidden>
+      <div id="mgMsg"></div>
+      <p class="note" style="margin:0">同じお名前のお客様は1人にまとめ、写真の回を追加します。同じ記録を2回取り込んでも重複しません。</p>
     </section>
     <section class="section"><h2 style="font-size:16px">記録の削除</h2>
-      <p class="note" style="margin:0">他の端末やスタッフとは記録が共有されません。</p>
+      <p class="note" style="margin:0">このスマホの記録だけが消えます。他のスタッフのスマホには影響しません。</p>
       <div id="rs"><button class="linkbtn warn" id="rsb">すべて消してサンプルに戻す</button></div></section></div>`);
   $("#cx").onclick=closeSheet;
+  bindCloudSection();
+  if(CLOUD.on){const l=document.querySelector('label[for="bkFile"]');if(l)l.remove();const r=$("#rs");if(r)r.closest(".section").remove()}
   $("#ss").onclick=()=>{S.salon=$("#sn").value.trim();save();closeSheet();render();toast("保存しました")};
   $("#bkSave").onclick=async()=>{const b=$("#bkSave");b.disabled=true;await saveBackup();b.disabled=false;if($("#sheet").hidden===false&&$("#bkSave"))openSettings()};
   $("#bkFile").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const fr=new FileReader();
@@ -626,7 +812,15 @@ function openSettings(){
       $("#bkN").onclick=()=>{$("#bkMsg").innerHTML=""};
       $("#bkY").onclick=()=>{S=migrate(st);save();closeSheet();view={name:"list"};render();toast("バックアップから戻しました")}};
     fr.readAsText(f)};
-  $("#rsb").onclick=()=>{$("#rs").innerHTML=`<div class="confirm"><div>撮影した写真と記録がすべて消えます。元に戻せません。</div><div class="row2"><button class="btn ghost sm" id="rN">やめる</button><button class="btn danger sm" id="rY">消す</button></div></div>`;
+  $("#mgFile").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;$("#mgMsg").innerHTML='<p class="note" style="margin:0">読み込んでいます…</p>';const fr=new FileReader();
+    fr.onload=()=>{let st=null;try{const o=JSON.parse(fr.result);st=o.state||o;if(!st||!Array.isArray(st.customers))throw 0}catch(err){$("#mgMsg").innerHTML='<p class="note" style="color:var(--warn);margin:0">このファイルはバックアップとして読み込めませんでした。「minusten-backup-日付.json」のファイルを選んでください。</p>';return}
+      const plan=planMerge(st);
+      if(!plan.newC&&!plan.addV){$("#mgMsg").innerHTML='<p class="note" style="margin:0">このファイルの記録は、すべてこのスマホに入っています。追加するものはありません。</p>';return}
+      $("#mgMsg").innerHTML=`<div class="confirm" style="border-color:var(--line)"><div>新しいお客様 <b>${plan.newC}名</b>、すでにいるお客様への追加 <b>${plan.updC}名</b>、追加される来店記録 <b>${plan.addV}回分</b>を取り込みます。${plan.skipB?`<br><span class="note">同じお客様のビフォアが両方にあったため、${plan.skipB}件はこのスマホのビフォアを残しました。</span>`:""}</div><div class="row2"><button class="btn ghost sm" id="mgN">やめる</button><button class="btn sm" id="mgY">追加する</button></div></div>`;
+      $("#mgN").onclick=()=>{$("#mgMsg").innerHTML=""};
+      $("#mgY").onclick=()=>{applyMerge(st);save();closeSheet();view={name:"list"};render();toast(`${plan.addV}回分の記録を追加しました`)}};
+    fr.readAsText(f)};
+  if($("#rsb"))$("#rsb").onclick=()=>{$("#rs").innerHTML=`<div class="confirm"><div>撮影した写真と記録がすべて消えます。元に戻せません。</div><div class="row2"><button class="btn ghost sm" id="rN">やめる</button><button class="btn danger sm" id="rY">消す</button></div></div>`;
     $("#rN").onclick=openSettings;$("#rY").onclick=()=>{S=defaultState();save();closeSheet();view={name:"list"};render();toast("サンプルに戻しました")}};
 }
 
@@ -695,7 +889,7 @@ if(IN_LINE&&!/openExternalBrowser=1/.test(location.search)){location.replace(loc
 function inAppBanner(){if(!IN_APP||$("#iab"))return;const isA=/Android/i.test(UA);
   document.body.insertAdjacentHTML("afterbegin",`<div id="iab" class="iab"><b>${isA?"Chrome":"Safari"}で開いてください</b>アプリ内の画面では、撮影やLINEへの送信がうまく動きません。右上（または右下）のメニューから「${isA?"他のアプリで開く":"Safariで開く"}」「ブラウザで開く」を選んでください。</div>`)}
 inAppBanner();
-(async()=>{S=migrate(await load()||defaultState());render()})();
+(async()=>{S=migrate(await load()||defaultState());LOCAL_S=S;render();if(FIREBASE_CONFIG&&cloudFlag())ensureFirebase().catch(()=>{})})();
 })();
 </script>
 
