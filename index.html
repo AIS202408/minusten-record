@@ -607,7 +607,7 @@ async function openShare(){
 
 // ---------- cloud sharing (Firebase: one login per salon, shared by all staff) ----------
 const FIREBASE_CONFIG={apiKey:"AIzaSyDLmfVd_NB2jhf1JW0bYU3LV-Nn4I7It_8",authDomain:"minusten-record.firebaseapp.com",projectId:"minusten-record",storageBucket:"minusten-record.firebasestorage.app",messagingSenderId:"580936800601",appId:"1:580936800601:web:53448d29ba99ad97031448"};
-const SALON_DOMAIN="salon.youforio.com",FB_VER="10.14.1";
+const SALON_DOMAIN="ais.com",FB_VER="10.14.1";
 const CLOUD={on:false,uid:null,id:"",db:null,auth:null,unsubs:[],loaded:{s:0,c:0,v:0,p:0},state:"",syncing:false,again:false,errShown:false,
   synced:{s:null,c:{},v:{},p:{}},P:{},orphanV:{}};
 let LOCAL_S=null,fbReady=null;
@@ -679,8 +679,7 @@ function exitCloud(){
 }
 async function cloudLogin(id,pw){
   await ensureFirebase();
-  const email=id.includes("@")?id:`${id}@${SALON_DOMAIN}`;
-  await CLOUD.auth.signInWithEmailAndPassword(email,pw);
+  await CLOUD.auth.signInWithEmailAndPassword(id.includes("@")?id:`${id}@${SALON_DOMAIN}`,pw);
   cloudFlag(true);
 }
 async function cloudLogout(){
