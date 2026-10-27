@@ -136,6 +136,20 @@ button{cursor:pointer}
 body.gated{overflow:hidden}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .gate-in .logo{filter:brightness(2.1)}}
 :root[data-theme="dark"] .gate-in .logo{filter:brightness(2.1)}
+.vid-card{display:flex;align-items:center;gap:14px;width:100%;margin-top:12px;padding:12px 14px;border:1px solid var(--orange);border-radius:6px;background:transparent;text-align:left}
+.vid-card .vid-play{flex:none;width:46px;height:46px;border-radius:50%;background:var(--orange);color:#fff;display:grid;place-items:center;font-size:18px;padding-left:3px}
+.vid-card b{display:block;font-family:var(--f-display);font-size:17px}
+.vid-card span span{font-size:12px;color:var(--muted)}
+.vid-link{color:var(--gold-ink)!important;font-weight:700;text-decoration:none!important;font-size:13px;padding:0}
+.vid{position:fixed;inset:0;z-index:60;background:#0e0e0d;color:#fff;display:grid;grid-template-rows:auto 1fr auto auto;gap:10px;padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:calc(10px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-bottom,0px))}
+.vid-top{display:flex;justify-content:space-between;align-items:center}
+.vid .iconbtn{color:#ddd;border-color:#444}
+.vid video{width:100%;height:100%;min-height:0;object-fit:contain;background:#000;border-radius:8px}
+.vid-chaps{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.vid-chaps .chip{flex:none;background:transparent;border-color:#555;color:#eee;font-size:13px;height:34px}
+.vid-err{margin:0;color:#f0a08c;font-size:13px}
+.gate-links{display:flex;gap:18px;flex-wrap:wrap}
+.gate-links .gate-link{background:none;border:0;padding:0;font:inherit;cursor:pointer}
 /* list */
 .clist{display:grid}
 .crow{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
@@ -207,9 +221,6 @@ input[type=range]{width:100%;accent-color:var(--gold)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .confirm{padding:14px;border:1px solid var(--warn);border-radius:4px;display:grid;gap:10px}
 .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:13px;z-index:40}
-.bswitch{display:grid;grid-template-columns:1fr 1fr;margin-top:12px;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
-.bswitch a{display:flex;align-items:center;justify-content:center;height:34px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.04em;text-decoration:none;color:var(--muted)}
-.bswitch a[aria-current="page"]{background:var(--bg);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .hero-note{padding:14px;background:var(--surface);border-radius:4px;font-size:13px}
 </style>
 
@@ -272,11 +283,11 @@ function renderList(){
       <div class="meta num">${v?"前回 "+md(v.date):"まだ撮影していません"}</div></div>
       <div class="cnt num">${tcount(c)}<small>回</small></div></button>`}).join("");
   $("#app").innerHTML=`
-  ${CLOUD.on?`<nav class="bswitch" aria-label="アプリの切り替え"><a href="/minusten-record/" aria-current="page">マイナステン</a><a href="/choiku-record/" >超育</a></nav>`:""}
   <header class="brandbar"><img class="logo" src="${LOGO}" alt="マイナステン"><button class="iconbtn" id="setBtn">${FIREBASE_CONFIG?"設定・共有":"設定・バックアップ"}</button></header>
   ${CLOUD.on?`<div class="cloud-chip" id="cloudChip">${chipHTML()}</div>`:""}
   <figure class="hero"><img src="${BANNER}" alt="マイナステントリートメントのビフォアアフター事例" width="1200" height="677"></figure>
   ${(()=>{const real=!CLOUD.on&&S.customers.some(c=>!c.sample&&c.visits.length);if(!real)return"";const old=!S.lastBackup||(Date.now()-new Date(S.lastBackup))/864e5>30;return old?`<button class="bk-note" id="bkNote"><b>バックアップ</b> ${S.lastBackup?"前回から30日以上たっています":"まだ保存していません"}。ここから保存できます →</button>`:""})()}
+  <button class="vid-card" data-video="${VT.login}"><span class="vid-play" aria-hidden="true">▶</span><span><b>使い方を動画で見る</b><span>撮る・比べる・送るを約1分で</span></span></button>
   ${(()=>{if(!CLOUD.on||!LOCAL_S)return"";const n=LOCAL_S.customers.filter(c=>!c.sample&&c.visits.length).length;let done=false;try{done=localStorage.getItem("mt-moved")==="1"}catch(e){}if(!n||done)return"";return `<button class="bk-note" id="mvNote"><b>以前の記録</b> このスマホに、ログイン前の記録が${n}名分あります。ここから共有に追加できます →</button>`})()}
   ${(()=>{const it=galItems("back",true);if(!it.length)return"";const t=it.slice(0,3).map(x=>`<img src="${srcOf(angPh(x.B,"back"))}" alt="">`).join("");return `<button class="col-btn" id="colBtn"><span class="thumbs">${t}</span><span><b>コレクション</b><span>ビフォアアフター ${it.length}件を一覧で見る</span></span><span class="go">›</span></button>`})()}
   <section class="section">
@@ -435,7 +446,7 @@ function openCapture(editId,asBefore,startAngle){
   openSheet(`<div class="app">
     <header class="top"><button class="iconbtn" id="cx">閉じる</button><div style="text-align:right"><div class="eyebrow">${esc(c.name)} 様</div><h1>${me}${editing?"を編集":"の撮影"}</h1></div></header>
     <section class="section">
-      <div class="field"><span class="flabel">撮影する方向（✓は登録済み）</span><div class="tabs" id="tabs"></div></div>
+      <div class="field"><span class="flabel">撮影する方向（✓は登録済み）　${vidBtn(VT.before,"撮り方を動画で見る")}</span><div class="tabs" id="tabs"></div></div>
       <div id="panel" style="display:grid;gap:12px"></div>
       <input type="file" id="file" class="vh" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
       <input type="file" id="file2" class="vh" accept="image/*" tabindex="-1" aria-hidden="true">
@@ -546,7 +557,7 @@ async function openShare(){
     <section class="section"><div id="imgWrap"><p class="muted">画像をつくっています…</p></div>
       <label class="chk"><input type="checkbox" id="inImg" ${isAndroid?"checked":""}> メッセージを画像の中に入れる${isAndroid?"（Androidは画像と文章を一緒に送れないため、オンがおすすめ）":""}</label>
       <div id="shareArea" style="display:grid;gap:8px"></div>
-      <p class="note" id="shareNote">画像を長押しして保存し、LINEで送ってください。</p></section>
+      <p class="note" id="shareNote">画像を長押しして保存し、LINEで送ってください。</p>${vidBtn(VT.line,"送り方を動画で見る")}</section>
     <section class="section"><div class="field"><label for="msg">メッセージ</label><textarea id="msg" rows="6"></textarea></div>
       <button class="btn ghost block" id="cp">メッセージをコピー</button></section></div>`);
   $("#cx").onclick=closeSheet;
@@ -652,7 +663,7 @@ let rTimer=0;const schedRender=()=>{cancelAnimationFrame(rTimer);rTimer=requestA
 function sortCustomers(){S.customers.sort((a,b)=>((a.sample?1:0)-(b.sample?1:0))||((b.created||0)-(a.created||0)))}
 function setCloudState(t){CLOUD.state=t;const el=$("#cloudChip");if(el)el.innerHTML=chipHTML()}
 function chipHTML(){const ld=CLOUD.loaded,loading=!(ld.s&&ld.c&&ld.v&&ld.p);
-  return `<span class="dot ${loading||CLOUD.state==="saving"?"busy":CLOUD.state==="error"?"err":""}"></span>共有中：${esc(CLOUD.id)}<span class="cs">${loading?"読み込み中…":CLOUD.state==="saving"?"保存中…":CLOUD.state==="error"?"保存できませんでした":"最新です"}</span>`}
+  return `<span class="dot ${loading||CLOUD.state==="saving"?"busy":CLOUD.state==="error"?"err":""}"></span>共有中：${S.salon?esc(S.salon)+"（"+esc(CLOUD.id)+"）":esc(CLOUD.id)}<span class="cs">${loading?"読み込み中…":CLOUD.state==="saving"?"保存中…":CLOUD.state==="error"?"保存できませんでした":"最新です"}</span>`}
 function fillPhotos(v){ANGLES.forEach(([a])=>{const d=CLOUD.P[v.id+"_"+a];v[PF[a]]=d||null})}
 function enterCloud(u){
   if(CLOUD.on&&CLOUD.uid===u.uid)return;
@@ -662,7 +673,11 @@ function enterCloud(u){
   view={name:"list"};closeSheet();render();
   const base=salonRef(),un=CLOUD.unsubs,err=e=>{setCloudState("error");console.warn(e)};
   base.set({loginId:CLOUD.id,lastActive:Date.now()},{merge:true}).catch(()=>{});
-  un.push(base.onSnapshot(d=>{const x=d.data()||{};S.salon=x.salonName||"";CLOUD.synced.s=S.salon;CLOUD.loaded.s=1;schedRender()},err));
+  un.push(base.onSnapshot(d=>{const x=d.data()||{};S.salon=x.salonName||"";CLOUD.synced.s=S.salon;CLOUD.loaded.s=1;
+    const fromCache=!!(d.metadata&&d.metadata.fromCache);
+    if(S.salon){const g=$("#nameSetup");if(g)g.remove()}
+    else if(!fromCache&&!$("#nameSetup"))showNameSetup();
+    schedRender()},err));
   un.push(base.collection("customers").onSnapshot(qs=>{
     qs.docChanges().forEach(ch=>{const id=ch.doc.id,d=ch.doc.data();
       if(ch.type==="removed"){S.customers=S.customers.filter(c=>c.id!==id);delete CLOUD.synced.c[id];return}
@@ -769,6 +784,44 @@ function bindCloudSection(){
 }
 
 
+// ---------- how-to video ----------
+const VIDEO_URL="https://ais202408.github.io/minusten-record/howto.mp4";
+const VT={top:0,home:2.6,login:43.8,before:50.2,compare:69.4,line:72.6,collection:75.8};
+function openVideo(at){
+  const ov=document.createElement("div");ov.className="vid";ov.setAttribute("role","dialog");ov.setAttribute("aria-label","使い方の動画");
+  ov.innerHTML=`<div class="vid-top"><b>使い方の動画</b><button class="iconbtn" id="vX">閉じる</button></div>
+    <video id="vV" controls playsinline preload="auto" src="${VIDEO_URL}#t=${at||0}"></video>
+    <div class="vid-chaps">${[["home","ホーム画面に追加"],["login","ログイン"],["before","写真を撮る"],["compare","比べる"],["line","LINEで送る"],["collection","コレクション"]].map(([k,l])=>`<button class="chip" data-vt="${k}">${l}</button>`).join("")}</div>
+    <p class="vid-err" id="vE" hidden>動画を読み込めませんでした。インターネットにつながっているか確認してください。</p>`;
+  document.body.appendChild(ov);const v=ov.querySelector("#vV");
+  const close=()=>{try{v.pause()}catch(e){}ov.remove();document.removeEventListener("keydown",key)};
+  const key=e=>{if(e.key==="Escape")close()};document.addEventListener("keydown",key);
+  ov.querySelector("#vX").onclick=close;
+  v.addEventListener("error",()=>{ov.querySelector("#vE").hidden=false});
+  v.addEventListener("loadedmetadata",()=>{if(at&&Math.abs(v.currentTime-at)>1)v.currentTime=at},{once:true});
+  ov.querySelectorAll("[data-vt]").forEach(b=>b.onclick=()=>{v.currentTime=VT[b.dataset.vt];v.play().catch(()=>{})});
+  v.play().catch(()=>{});
+}
+const vidBtn=(at,label,cls)=>`<button class="${cls||"linkbtn vid-link"}" data-video="${at||0}">▶ ${label}</button>`;
+document.addEventListener("click",e=>{const b=e.target.closest("[data-video]");if(b){e.preventDefault();openVideo(+b.dataset.video)}});
+
+// ---------- first-login salon name registration (shared by every device on the same ID) ----------
+function showNameSetup(){
+  const g=document.createElement("div");g.id="nameSetup";g.className="gate";
+  g.innerHTML=`<form class="gate-in" id="nsForm">
+    <img class="logo" src="${LOGO}" alt="マイナステン">
+    <div><div class="eyebrow">はじめに 1回だけ</div><h1 class="gate-title">サロン名を登録</h1></div>
+    <p class="note" style="margin:0;font-size:14px">お客様に送る画像に入るサロン名です。<b>同じサロンID（${esc(CLOUD.id)}）でログインするスタッフ全員</b>に共通で保存されるので、登録は最初の1回だけです。</p>
+    <div class="field"><label for="nsName">サロン名</label><input id="nsName" maxlength="40" placeholder="例：Hair Salon ○○" autocomplete="organization" required></div>
+    <button class="btn block" id="nsBtn" type="submit">登録してはじめる</button>
+    <p class="note">あとから「設定・共有」でいつでも変更できます。</p>
+  </form>`;
+  document.body.appendChild(g);document.body.classList.add("gated");
+  setTimeout(()=>{const i=$("#nsName");if(i)i.focus()},50);
+  $("#nsForm").onsubmit=e=>{e.preventDefault();const v=$("#nsName").value.trim();if(!v){$("#nsName").focus();return}
+    S.salon=v;save();g.remove();document.body.classList.remove("gated");render();toast("サロン名を登録しました")};
+}
+
 // ---------- login gate (an account is required to use the app) ----------
 function showGate(mode,msg){
   const g=$("#gate");g.hidden=false;document.body.classList.add("gated");
@@ -783,7 +836,7 @@ function showGate(mode,msg){
     <button class="btn block" id="gBtn" type="submit">ログイン</button>
     <p class="note gate-err" id="gMsg" ${msg?"":"hidden"}>${esc(msg||"")}</p>
     <p class="note">サロンIDとパスワードは、ユーフォリオからの案内をご確認ください。一度ログインすると、次からは自動でログインします。</p>
-    <a class="gate-link" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">使い方を見る ›</a>
+    <div class="gate-links"><button class="gate-link" type="button" data-video="0">▶ 動画で見る</button><a class="gate-link" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">使い方を見る ›</a></div>
   </form>`;
   $("#gForm").onsubmit=async e=>{e.preventDefault();const id=$("#gId").value.trim(),pw=$("#gPw").value,b=$("#gBtn"),m=$("#gMsg");
     if(!id||!pw)return;b.disabled=true;b.textContent="ログインしています…";m.hidden=true;
@@ -817,10 +870,11 @@ function applyMerge(st){mergeWork(st,true)}
 // ---------- settings ----------
 function openSettings(){
   openSheet(`<div class="app"><header class="top"><button class="iconbtn" id="cx">閉じる</button><h1>設定</h1></header>
-    <a class="btn ghost block" style="margin-top:14px;text-decoration:none" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">使い方を見る（画面の写真つき）</a>
+    <div class="row2" style="margin-top:14px"><button class="btn block" data-video="0">▶ 動画で見る</button><a class="btn ghost block" style="text-decoration:none" href="https://ais202408.github.io/minusten-record/manual.html" target="_blank" rel="noopener">写真つきの説明</a></div>
     <section class="section">
-      <div class="field"><label for="sn">サロン名（送る画像に入ります）</label><input id="sn" value="${esc(S.salon)}" placeholder="例：Hair Salon ○○"></div>
-      <button class="btn block" id="ss">保存</button>
+      <div class="field"><label for="sn">サロン名</label><input id="sn" value="${esc(S.salon)}" placeholder="例：Hair Salon ○○" maxlength="40"></div>
+      <p class="note" style="margin:0">${CLOUD.on?"同じサロンIDのスタッフ全員で共通です。変更すると全員のアプリと送る画像に反映されます。":"送る画像に入ります。"}</p>
+      <button class="btn block" id="ss">サロン名を変更する</button>
     </section>
     ${cloudSectionHTML()}
     <section class="section local-only"><h2 style="font-size:16px">バックアップ</h2>
@@ -851,7 +905,7 @@ function openSettings(){
   $("#cx").onclick=closeSheet;
   bindCloudSection();
   if(CLOUD.on){document.querySelectorAll(".local-only").forEach(e=>e.remove());const r=$("#rs");if(r)r.closest(".section").remove()}
-  $("#ss").onclick=()=>{S.salon=$("#sn").value.trim();save();closeSheet();render();toast("保存しました")};
+  $("#ss").onclick=()=>{const v=$("#sn").value.trim();if(!v){$("#sn").focus();toast("サロン名を入れてください");return}S.salon=v;save();closeSheet();render();toast("サロン名を変更しました")};
   if($("#bkSave"))$("#bkSave").onclick=async()=>{const b=$("#bkSave");b.disabled=true;await saveBackup();b.disabled=false;if($("#sheet").hidden===false&&$("#bkSave"))openSettings()};
   if($("#bkFile"))$("#bkFile").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;const fr=new FileReader();
     fr.onload=()=>{let st=null,at="";try{const o=JSON.parse(fr.result);st=o.state||o;at=o.savedAt?o.savedAt.slice(0,10).replace(/-0?/g,"/"):"";if(!st||!Array.isArray(st.customers))throw 0}catch(err){$("#bkMsg").innerHTML='<p class="note" style="color:var(--warn);margin:0">このファイルはバックアップとして読み込めませんでした。「minusten-backup-日付.json」のファイルを選んでください。</p>';return}
